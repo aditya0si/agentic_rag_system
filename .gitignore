@@ -1,0 +1,45 @@
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Secrets & Environment Variables
+.env
+*.env
+backend/.env
+
+# Vector Store & Database Artifacts
+chroma_db/
+backend/chroma_db/
+*.sqlite3
+
+# Python Caches & Build Directories
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Testing & Linting Caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Temporary files & Logs
+*.log
+backend/temp/
+temp/
+
+# OS & IDE Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

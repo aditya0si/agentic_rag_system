@@ -1,0 +1,4 @@
+# Frontend Dependencies for Streamlit
+streamlit>=1.38.0
+httpx>=0.28.0
+python-dotenv>=1.0.0

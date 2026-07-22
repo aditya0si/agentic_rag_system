@@ -1,0 +1,70 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+.tox/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Data
+chroma_db/
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+temp/
+*.tmp
+*.temp
+
+# Documentation
+*.md
+!README.md
+
+# Tests (keep in source, not in image)
+test_*.py
+tests/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Frontend
+frontend/__pycache__/
+frontend/components/__pycache__/
+frontend/utils/__pycache__/

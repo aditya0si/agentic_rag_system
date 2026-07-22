@@ -1,0 +1,77 @@
+[
+  {
+    "question": "What is LangGraph?",
+    "ground_truth": "LangGraph is a library for building stateful, multi-actor applications with LLMs that extends the LangChain Expression Language (LCEL) with multi-agent coordination capabilities.",
+    "context": "LangGraph is a library for building stateful, multi-actor applications with LLMs. It extends the LangChain Expression Language (LCEL) with the ability to coordinate multiple chains."
+  },
+  {
+    "question": "What does the Query Rewriter agent do?",
+    "ground_truth": "The Query Rewriter agent reformulates raw input search queries using prior conversation history context to create standalone questions.",
+    "context": "The Query Rewriter node reformulates raw inputs using prior history context. Given a conversation history and a follow-up question, it rewrites the follow-up question into a standalone question that captures all relevant context from the history."
+  },
+  {
+    "question": "What is the purpose of the Relevance Grader agent?",
+    "ground_truth": "The Relevance Grader agent evaluates whether retrieved document chunks are relevant to the search query and filters out irrelevant ones to prevent the generator from using noisy information.",
+    "context": "A key component is the Relevance Grader agent, which evaluates whether a retrieved chunk is relevant to the user's question. This prevents the generator from using noisy information."
+  },
+  {
+    "question": "What does the Hallucination Checker do?",
+    "ground_truth": "The Hallucination Checker validates generated answers against retrieved sources to check if the answer contains any unsupported claims, extrapolations, or hallucinations.",
+    "context": "The Hallucination Checker validates generated answers against retrieved sources. It evaluates if the answer contains any claims, facts, or assumptions that are NOT supported by the contexts."
+  },
+  {
+    "question": "How does the ingestion pipeline process documents?",
+    "ground_truth": "The ingestion pipeline extracts text from PDF, DOCX, and TXT files, chunks the text using RecursiveCharacterTextSplitter with 500 character chunks and 50 character overlap, and stores embeddings in ChromaDB with metadata including page numbers.",
+    "context": "Document ingestion pipeline — text extraction, chunking, and metadata mapping. Extracts text from PDF via pdfplumber, DOCX via python-docx, TXT via built-in read. Chunking with RecursiveCharacterTextSplitter (500 tokens, 50 overlap). Page-number tracking during extraction."
+  },
+  {
+    "question": "What vector store is used and why?",
+    "ground_truth": "ChromaDB is used as the vector store because it runs locally, is easy to set up, and is zero cost - sufficient for portfolio scale.",
+    "context": "ChromaDB is a vector database used to store and query document embeddings. It runs locally and is easy to set up."
+  },
+  {
+    "question": "What LLM providers are supported?",
+    "ground_truth": "The system supports OpenAI (GPT-4o-mini) and Google Gemini (gemini-2.0-flash) as LLM providers, with Google Gemini as the default for zero-cost development.",
+    "context": "LLM Provider Configuration — OpenAI (gpt-4o-mini) or Google (gemini-2.0-flash). Start with Gemini (free tier) for zero-cost development; add OpenAI as an alternative config."
+  },
+  {
+    "question": "What embedding models are available?",
+    "ground_truth": "OpenAI's text-embedding-3-small and HuggingFace's all-MiniLM-L6-v2 are supported, with all-MiniLM-L6-v2 as the default for free local embeddings.",
+    "context": "Embedding Configuration — OpenAI (text-embedding-3-small) or HuggingFace (all-MiniLM-L6-v2). Use all-MiniLM-L6-v2 for zero-cost local development."
+  },
+  {
+    "question": "How does the agentic RAG pipeline handle multi-turn conversations?",
+    "ground_truth": "The Query Rewriter agent uses chat history to reformulate follow-up questions into standalone queries that capture context from previous turns, enabling coherent multi-turn conversations.",
+    "context": "The Query Rewriter agent reformulates the user question based on chat history. Given a conversation history and a follow-up question, it rewrites the follow-up question into a standalone question that captures all relevant context from the history."
+  },
+  {
+    "question": "What are the steps in the agentic RAG pipeline?",
+    "ground_truth": "The pipeline has 5 steps: Query Rewriter -> Retriever -> Relevance Grader -> Answer Generator -> Hallucination Checker, executed in sequence via LangGraph.",
+    "context": "LangGraph StateGraph with 5 nodes: rewrite -> retrieve -> grade -> generate -> hallucination_check. The pipeline executes in sequence: query rewriting, retrieval, relevance grading, answer generation, and hallucination checking."
+  },
+  {
+    "question": "What file types can be uploaded?",
+    "ground_truth": "PDF, DOCX, TXT, and MD files can be uploaded with a 20MB size limit per file.",
+    "context": "Accepts a document upload, validates the extension and size. Supported extensions: .pdf, .docx, .txt, .md. File size limit: 20MB."
+  },
+  {
+    "question": "How are citations generated in answers?",
+    "ground_truth": "Answers include inline citations with context block indices in brackets (e.g., [1][2]) linking claims to source documents with page numbers.",
+    "context": "For statements you make that are based on a context block, include an inline citation with its index in brackets, like 'according to the protocol [1]'. If multiple contexts support a claim, include multiple citations like '[1][2]'."
+  },
+  {
+    "question": "What happens when no relevant information is found?",
+    "ground_truth": "The system returns a fallback message: 'I couldn't find relevant information in the uploaded document(s) to answer this.' rather than hallucinating an answer.",
+    "context": "If the answer cannot be found or inferred from the contexts, honestly state: 'I couldn't find relevant information in the uploaded document(s) to answer this.' Do not make up facts or use external knowledge."
+  },
+  {
+    "question": "How does document filtering work in the frontend?",
+    "ground_truth": "Users can select specific documents in the sidebar to scope questions to only those documents, with all documents selected by default.",
+    "context": "Sidebar supports multi-document selection for query scoping. Users can scope questions to specific uploaded documents using a multiselect dropdown."
+  },
+  {
+    "question": "What is the difference between naive RAG and agentic RAG?",
+    "ground_truth": "Naive RAG directly connects retriever to generator without intermediate agents. Agentic RAG adds Query Rewriter, Relevance Grader, and Hallucination Checker agents for better accuracy and groundedness.",
+    "context": "Basic RAG Chain (naive RAG baseline) wires retriever directly to generator without query rewriter or relevance grader agents. The full LangGraph pipeline adds query rewriter, relevance grader, and hallucination checker nodes."
+  }
+]
