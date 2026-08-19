@@ -57,6 +57,15 @@ RETRIEVAL_TOP_K: int = int(os.getenv("RETRIEVAL_TOP_K", "6"))
 CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "500"))
 CHUNK_OVERLAP: int = int(os.getenv("CHUNK_OVERLAP", "50"))
 
+# Web deployment. Keep the default deliberately narrow: wildcard origins cannot
+# safely be used together with credentialed browser requests in production.
+CORS_ORIGINS: list[str] = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:8501").split(",")
+    if origin.strip()
+]
+ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development").lower()
+
 
 # =============================================================================
 # Validation
@@ -75,5 +84,7 @@ def validate_config() -> list[str]:
         warnings.append("LLM_PROVIDER is 'google' but GOOGLE_API_KEY is not set.")
     if EMBEDDING_PROVIDER == "openai" and not OPENAI_API_KEY:
         warnings.append("EMBEDDING_PROVIDER is 'openai' but OPENAI_API_KEY is not set.")
+    if "*" in CORS_ORIGINS and ENVIRONMENT == "production":
+        warnings.append("CORS_ORIGINS must not contain '*' in production.")
 
     return warnings

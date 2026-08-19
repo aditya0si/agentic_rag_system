@@ -13,7 +13,7 @@ WORKDIR /app
 
 # Copy and install frontend dependencies
 COPY frontend/ frontend/
-RUN pip install -eek=1 pip install --no-cache-dir -r frontend/requirements.txt 2>/dev/null || true
+RUN pip install --no-cache-dir -r frontend/requirements.txt
 
 # Create .streamlit directory
 RUN mkdir -p /home/appuser/.streamlit && chown -R appuser:appuser /home/appuser

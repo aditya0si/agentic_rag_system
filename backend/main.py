@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import warnings
 
-from .config import validate_config
+from .config import CORS_ORIGINS, validate_config
 from .logging_config import configure_logging
 from .routers import health, upload, ask, metrics as metrics_router, stream
 from .middleware.request_logging import RequestLoggingMiddleware
@@ -40,10 +40,11 @@ app = FastAPI(
 # Middleware (order matters: last added = outermost)
 # ---------------------------------------------------------------------------
 
-# CORS — allow Streamlit frontend (typically localhost:8501) to call the API
+# CORS — explicitly allow the deployed web client. Configure additional
+# origins through CORS_ORIGINS rather than exposing credentialed APIs to '*'.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

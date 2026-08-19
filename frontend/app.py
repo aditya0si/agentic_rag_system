@@ -46,6 +46,13 @@ h1 { font-size: 2rem !important; }
 h2 { font-size: 1.5rem !important; }
 h3 { font-size: 1.15rem !important; }
 
+/* ── Product dashboard elements ── */
+.product-kicker { color: #4F46E5; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.welcome-panel { background: radial-gradient(circle at top right, #E0E7FF 0%, transparent 38%), #FFFFFF; border: 1px solid #E2E8F0; border-radius: 20px; padding: 28px; margin: 16px 0 24px; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06); }
+.metric-card { background: rgba(255,255,255,0.76); border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px 14px; }
+.metric-value { color: #0F172A; font-size: 1.15rem; font-weight: 750; }
+.metric-label { color: #64748B; font-size: 0.75rem; margin-top: 2px; }
+
 /* ── App Background ── */
 .stApp {
     background: linear-gradient(135deg, #F0F4FF 0%, #F8FAFC 50%, #EEF2FF 100%);
@@ -185,11 +192,11 @@ render_sidebar(st.session_state.session_id)
 
 col1, col2 = st.columns([6, 1])
 with col1:
-    st.title("🔍 Agentic RAG Research Assistant")
+    st.markdown("<div class='product-kicker'>Your research workspace</div>", unsafe_allow_html=True)
+    st.title("🔍 Ask better questions of your documents")
     st.markdown(
         "<span style='color:#64748B; font-size:0.95rem;'>"
-        "AI-powered literature review &amp; policy analysis — "
-        "grounded answers with source citations &amp; hallucination detection."
+        "Upload a source, ask in plain English, and verify every answer with citations."
         "</span>",
         unsafe_allow_html=True
     )
@@ -215,6 +222,44 @@ with col2:
         )
 
 st.markdown("---")
+
+# ── First-use onboarding ────────────────────────────────────────────────────
+if not st.session_state.messages:
+    st.markdown(
+        """
+        <div class="welcome-panel">
+          <div class="product-kicker">Grounded AI, not guesswork</div>
+          <h2 style="margin:8px 0 8px;">Turn dense files into confident answers.</h2>
+          <p style="color:#64748B; margin:0; max-width:680px;">Start by adding PDFs, Word files, notes, or Markdown in the left panel. Every answer is based on the documents you choose and includes its source passages.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    metric_cols = st.columns(3)
+    for column, value, label in zip(
+        metric_cols,
+        ("Focused scope", "Cited answers", "Multi-agent review"),
+        ("Choose exactly which documents to search", "Inspect the original passage and page", "Retrieval, relevance checks, and grounding"),
+    ):
+        with column:
+            st.markdown(
+                f"<div class='metric-card'><div class='metric-value'>{value}</div><div class='metric-label'>{label}</div></div>",
+                unsafe_allow_html=True,
+            )
+
+    if st.session_state.uploaded_docs:
+        st.markdown("##### Try one of these prompts")
+        starter_cols = st.columns(3)
+        starters = [
+            "Give me a concise summary of these documents.",
+            "What are the most important findings and why do they matter?",
+            "Compare the key arguments across the selected documents.",
+        ]
+        for column, prompt in zip(starter_cols, starters):
+            with column:
+                if st.button(prompt, key=f"starter_{starters.index(prompt)}", use_container_width=True):
+                    st.session_state.pending_question = prompt
+                    st.rerun()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 6. Chat History Rendering
@@ -258,11 +303,13 @@ for i, msg in enumerate(st.session_state.messages):
 
 # Disable input while a query is in flight
 disabled = st.session_state.query_in_flight
-
-if question := st.chat_input(
+question = st.chat_input(
     "Ask a question about your uploaded documents...",
     disabled=disabled
-):
+)
+question = question or st.session_state.pop("pending_question", None)
+
+if question:
     # Guard: no documents
     if not st.session_state.uploaded_docs:
         st.warning("⚠️ Please upload at least one document in the sidebar to get started.")

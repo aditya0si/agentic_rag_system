@@ -46,13 +46,13 @@
 
 ## SECTION D — PROGRESS CHECKLIST
 
-- [ ] Session 1: Author & Path Formatting Update in PDF Script
-  - [ ] Update Author name to **Aditya Singh** in `generate_architecture_pdf.py`
-  - [ ] Format file paths cleanly (e.g. `backend/core/agents/graph.py`) with links to `https://github.com/aditya0si/agentic_rag_system`
-  - [ ] Re-compile `rag_architecture_HCL_internship.pdf` and verify page layout
-- [ ] Session 2: Git Audit, Security Check & GitHub Push
-  - [ ] Audit `.gitignore` to ensure `.env`, `venv/`, `chroma_db/`, `__pycache__` are excluded
-  - [ ] Check `git status` to verify staged files contain no secrets or temporary bloat
-  - [ ] Commit staged files with clean commit message
-  - [ ] Configure remote origin `https://github.com/aditya0si/agentic_rag_system.git`
-  - [ ] Push main branch to GitHub remote
+- [x] Session 1: Author & Path Formatting Update in PDF Script
+  - [x] Update Author name to **Aditya Singh** in `generate_architecture_pdf.py`
+  - [x] Format file paths cleanly (e.g. `backend/core/agents/graph.py`) with links to `https://github.com/aditya0si/agentic_rag_system`
+  - [x] Re-compile `rag_architecture_HCL_internship.pdf` and verify page layout
+- [x] Session 2: Git Audit, Security Check & GitHub Push
+  - [x] Audit `.gitignore` to ensure `.env`, `venv/`, `chroma_db/`, `__pycache__` are excluded
+  - [x] Check `git status` to verify staged files contain no secrets or temporary bloat
+  - [x] Commit staged files with clean commit message
+  - [x] Configure remote origin `https://github.com/aditya0si/agentic_rag_system.git`
+  - [x] Push main branch to GitHub remote

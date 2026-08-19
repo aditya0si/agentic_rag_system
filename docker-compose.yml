@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Backend API Service
   backend:
@@ -22,6 +20,8 @@ services:
       - RETRIEVAL_TOP_K=6
       - CHUNK_SIZE=500
       - CHUNK_OVERLAP=50
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8501}
     volumes:
       - chroma_data:/app/backend/chroma_db
       - ./backend/.env:/app/backend/.env:ro

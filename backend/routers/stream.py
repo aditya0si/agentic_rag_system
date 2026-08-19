@@ -53,14 +53,16 @@ async def ask_question_stream(request: AskRequest):
 
     async def event_generator():
         try:
+            # `astream` executes the graph already. Build the final state from
+            # its node updates instead of invoking the graph a second time.
+            # The old implementation doubled LLM calls, cost, and latency.
+            final_state = dict(initial_state)
             # Use LangGraph's streaming API to get per-node updates
             async for event in agentic_pipeline.astream(initial_state, stream_mode="updates"):
                 for node_name, node_output in event.items():
+                    final_state.update(node_output)
                     yield f"data: {json.dumps({'type': 'node_end', 'node': node_name, 'keys': list(node_output.keys())})}\n\n"
                     await asyncio.sleep(0)  # yield control
-
-            # Final full result
-            final_state = agentic_pipeline.invoke(initial_state)
 
             answer = final_state.get("answer", "")
             relevant_chunks = final_state.get("relevant_chunks", [])
