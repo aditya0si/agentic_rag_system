@@ -1,0 +1,39 @@
+# Ruff configuration for the whole repository (backend app, tests, root scripts).
+# Single source of truth: CI runs `ruff check .` and `ruff format --check .` from
+# the repository root.
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "T20", # print statements
+]
+ignore = [
+    "E501",  # line too long (handled by the formatter)
+    "T201",  # print statements allowed in tests/scripts
+]
+
+[lint.per-file-ignores]
+"test_*.py" = ["T201", "S101"]
+"**/tests/*.py" = ["T201", "S101"]
+"__init__.py" = ["F401"]  # submodule re-exports are intentional
+# FastAPI dependency injection: File(...) / Form(...) / Depends(...) in argument
+# defaults is the documented idiom, not an accidental function call.
+"backend/routers/*.py" = ["B008"]
+# Legacy ad-hoc scripts at the backend root: they must adjust sys.path and set
+# environment variables before importing the application, so imports legitimately
+# follow executable statements. They are not part of the pytest suite.
+"backend/test_*.py" = ["E402"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

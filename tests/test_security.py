@@ -5,14 +5,17 @@ Validates input sanitization, prompt-injection detection, and filename validatio
 """
 
 import pytest
+
 from backend.core.security import (
-    sanitize_text,
-    validate_question,
-    validate_filename,
+    MAX_QUESTION_LENGTH,
     detect_prompt_injection,
     sanitize_chat_history,
-    MAX_QUESTION_LENGTH,
+    sanitize_text,
+    validate_filename,
+    validate_question,
 )
+
+pytestmark = pytest.mark.unit
 
 
 class TestSanitizeText:
@@ -32,12 +35,14 @@ class TestSanitizeText:
     def test_html_escapes(self):
         text = "<script>alert('xss')</script>"
         result = sanitize_text(text)
+        # sanitize_text HTML-escapes its input (html.escape(..., quote=False)),
+        # so raw markup must not survive and the escaped form must be present.
         assert "<script>" not in result
-        assert "<script>" in result
+        assert "&lt;script&gt;" in result
 
     def test_rejects_non_string(self):
         with pytest.raises(ValueError):
-            sanitize_text(123)
+            sanitize_text(123)  # type: ignore[arg-type]  # deliberately wrong type
 
 
 class TestValidateQuestion:
@@ -112,10 +117,7 @@ class TestPromptInjectionDetection:
 
 class TestSanitizeChatHistory:
     def test_truncates_long_history(self):
-        history = [
-            {"role": "user", "content": f"Question {i}"}
-            for i in range(100)
-        ]
+        history = [{"role": "user", "content": f"Question {i}"} for i in range(100)]
         result = sanitize_chat_history(history)
         assert len(result) == 50  # MAX_CHAT_HISTORY_TURNS
 

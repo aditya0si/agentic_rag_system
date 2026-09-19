@@ -27,7 +27,7 @@ def render_citations(citations: list[dict]):
             </span>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     # ── Citation Cards ──
@@ -64,7 +64,7 @@ def render_citations(citations: list[dict]):
                         f"<span style='background:{bg}; color:{color}; font-size:0.7rem; "
                         f"font-weight:600; padding:2px 8px; border-radius:8px;'>"
                         f"Relevance: {label_r} ({relevance:.0%})</span>",
-                        unsafe_allow_html=True
+                        unsafe_allow_html=True,
                     )
 
             # Chunk text with elegant styling
@@ -85,15 +85,11 @@ def render_citations(citations: list[dict]):
                     "{text}"
                 </div>
                 """,
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
 
             # Copy button for chunk text
-            if st.button(
-                "📋 Copy snippet",
-                key=f"copy_{doc_id}_{idx}",
-                use_container_width=False
-            ):
+            if st.button("📋 Copy snippet", key=f"copy_{doc_id}_{idx}", use_container_width=False):
                 st.toast("Snippet copied!", icon="📋")
 
     # ── Footer note ──

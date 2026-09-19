@@ -3,25 +3,29 @@ LLM Factory — centralized LLM client creation with caching.
 """
 
 from functools import lru_cache
-from langchain_openai import ChatOpenAI
+
+from langchain_core.language_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
+
 from ...config import (
-    LLM_PROVIDER,
-    OPENAI_MODEL,
-    OPENAI_API_KEY,
-    GOOGLE_MODEL,
     GOOGLE_API_KEY,
+    GOOGLE_MODEL,
+    LLM_PROVIDER,
+    OPENAI_API_KEY,
+    OPENAI_MODEL,
 )
 
 
 @lru_cache(maxsize=4)
-def get_llm(temperature: float = 0.0):
+def get_llm(temperature: float = 0.0) -> BaseChatModel:
     """
     Returns the configured LLM client with caching.
-    
+
     Args:
         temperature: Sampling temperature (0.0 = deterministic)
-        
+
     Returns:
         Configured LLM client instance
     """
@@ -29,7 +33,7 @@ def get_llm(temperature: float = 0.0):
         return ChatOpenAI(
             model=OPENAI_MODEL,
             temperature=temperature,
-            api_key=OPENAI_API_KEY,
+            api_key=SecretStr(OPENAI_API_KEY),
         )
     elif LLM_PROVIDER == "google":
         return ChatGoogleGenerativeAI(

@@ -85,18 +85,18 @@ venv\Scripts\activate
 source venv/bin/activate
 
 # 3. Install backend dependencies
-cd backend
-pip install -e ".[dev]"
+pip install -r backend/requirements.txt
+pip install pytest pytest-cov pytest-mock ruff mypy   # development tooling
 
 # 4. Configure environment
-cp .env.example .env
-# Edit .env with your API keys (GOOGLE_API_KEY for Gemini)
+cp backend/.env.example backend/.env
+# Edit backend/.env with your API keys (GOOGLE_API_KEY for Gemini)
 
-# 5. Start backend (Terminal 1)
-uvicorn main:app --reload --port 8000
+# 5. Start backend (Terminal 1) - run from the repository root
+uvicorn backend.main:app --reload --port 8000
 
 # 6. Install frontend dependencies (Terminal 2)
-cd ../frontend
+cd frontend
 pip install -r requirements.txt
 
 # 7. Start frontend
@@ -240,17 +240,22 @@ agentic-rag-assistant/
 
 ### Code Quality
 
+All commands run from the repository root; the configuration for every tool
+lives there (`ruff.toml`, `mypy.ini`, `pytest.ini`, `.coveragerc`).
+
 ```bash
 # Run linter
-cd backend
 ruff check .
-ruff format .
+ruff format --check .
 
 # Type checking
-mypy .
+mypy backend tests conftest.py
 
-# Run tests
-pytest tests/ -v --cov --cov-report=term-missing
+# Run tests (marker selections - see pytest.ini)
+pytest -m unit                              # fast, no network, no model downloads
+pytest -m "integration and not llm"          # real ChromaDB + local embedding model
+pytest -m llm                                # needs GOOGLE_API_KEY / OPENAI_API_KEY
+pytest                                       # everything
 ```
 
 ### Adding New Agents

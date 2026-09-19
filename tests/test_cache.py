@@ -5,7 +5,12 @@ Validates TTLCache get/set/expire and the cached decorators.
 """
 
 import time
-from backend.core.cache import TTLCache, llm_cache, embedding_cache
+
+import pytest
+
+from backend.core.cache import TTLCache, embedding_cache, llm_cache
+
+pytestmark = pytest.mark.unit
 
 
 class TestTTLCache:

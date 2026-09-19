@@ -26,7 +26,7 @@ def render_sidebar(session_id: str):
                 </div>
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
         st.markdown("---")
@@ -42,7 +42,7 @@ def render_sidebar(session_id: str):
             type=["pdf", "docx", "txt", "md"],
             accept_multiple_files=True,
             help="Maximum 20MB per file. Supported: PDF, DOCX, TXT, Markdown.",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
         )
 
         if uploaded_files:
@@ -52,25 +52,23 @@ def render_sidebar(session_id: str):
                 if uploaded_file.name not in uploaded_names:
                     with st.spinner(f"📥 Ingesting **{uploaded_file.name}**..."):
                         file_bytes = uploaded_file.read()
-                        res = upload_document_api(
-                            uploaded_file.name, file_bytes, session_id
-                        )
+                        res = upload_document_api(uploaded_file.name, file_bytes, session_id)
 
                         if "error" in res:
                             st.error(
-                                f"❌ Failed to index **{uploaded_file.name}**: "
-                                f"{res['message']}"
+                                f"❌ Failed to index **{uploaded_file.name}**: {res['message']}"
                             )
                         else:
-                            st.session_state.uploaded_docs.append({
-                                "doc_id": res["doc_id"],
-                                "filename": res["filename"],
-                                "chunks": res["chunks_created"]
-                            })
+                            st.session_state.uploaded_docs.append(
+                                {
+                                    "doc_id": res["doc_id"],
+                                    "filename": res["filename"],
+                                    "chunks": res["chunks_created"],
+                                }
+                            )
                             st.toast(
-                                f"✅ Indexed {res['filename']} "
-                                f"({res['chunks_created']} chunks)",
-                                icon="✅"
+                                f"✅ Indexed {res['filename']} ({res['chunks_created']} chunks)",
+                                icon="✅",
                             )
                             new_uploaded = True
             if new_uploaded:
@@ -87,8 +85,7 @@ def render_sidebar(session_id: str):
             # Summary stats
             total_chunks = sum(d["chunks"] for d in st.session_state.uploaded_docs)
             st.caption(
-                f"{len(st.session_state.uploaded_docs)} document(s) · "
-                f"{total_chunks} total chunks"
+                f"{len(st.session_state.uploaded_docs)} document(s) · {total_chunks} total chunks"
             )
 
             for i, doc in enumerate(st.session_state.uploaded_docs):
@@ -100,7 +97,7 @@ def render_sidebar(session_id: str):
                         f"<span style='font-size:0.75rem; color:#94A3B8;'>"
                         f"ID: <code>{doc['doc_id']}</code> · {doc['chunks']} chunks"
                         f"</span></div>",
-                        unsafe_allow_html=True
+                        unsafe_allow_html=True,
                     )
                 with col_del:
                     if st.button("🗑️", key=f"del_{doc['doc_id']}", help=f"Remove {doc['filename']}"):
@@ -121,10 +118,7 @@ def render_sidebar(session_id: str):
         st.markdown("### 🎯 Query Scope")
 
         if st.session_state.uploaded_docs:
-            doc_options = {
-                doc["filename"]: doc["doc_id"]
-                for doc in st.session_state.uploaded_docs
-            }
+            doc_options = {doc["filename"]: doc["doc_id"] for doc in st.session_state.uploaded_docs}
 
             # Quick-select buttons
             st.caption("Quick select:")
@@ -142,20 +136,18 @@ def render_sidebar(session_id: str):
                 "Documents to search:",
                 options=list(doc_options.keys()),
                 default=[
-                    name for name, did in doc_options.items()
+                    name
+                    for name, did in doc_options.items()
                     if did in st.session_state.get("selected_doc_ids", [])
-                ] or list(doc_options.keys()),
+                ]
+                or list(doc_options.keys()),
                 help="Only selected documents will be searched for answers.",
-                label_visibility="collapsed"
+                label_visibility="collapsed",
             )
-            st.session_state.selected_doc_ids = [
-                doc_options[name] for name in selected_filenames
-            ]
+            st.session_state.selected_doc_ids = [doc_options[name] for name in selected_filenames]
 
             if selected_filenames:
-                st.caption(
-                    f"🔎 Searching across {len(selected_filenames)} document(s)"
-                )
+                st.caption(f"🔎 Searching across {len(selected_filenames)} document(s)")
             else:
                 st.warning("⚠️ No documents selected — queries will return no results.")
         else:

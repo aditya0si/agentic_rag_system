@@ -1,21 +1,36 @@
-name: CI/CD Pipeline
+name: CI
+
+# Every job below either runs a real check or fails. There is no
+# `continue-on-error`, no `|| true`, and no test step that is allowed to pass
+# unconditionally. Jobs that need infrastructure this repository does not have
+# (Hugging Face deploy credentials, an LLM provider key) are `workflow_dispatch`
+# only and fail fast with an explicit message when their inputs are missing.
 
 on:
   push:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 env:
   PYTHON_VERSION: '3.11'
-  POETRY_VERSION: '1.8.0'
+  RUFF_VERSION: '0.16.3'
+  MYPY_VERSION: '2.3.1'
 
 jobs:
-  # =============================================================================
-  # Code Quality Checks
-  # =============================================================================
-  lint-and-format:
-    name: Lint & Format
+  # ===========================================================================
+  # Lint, format and type checks
+  # ===========================================================================
+  lint:
+    name: Lint, format & types
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -27,27 +42,33 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install tooling (pinned)
         run: |
           pip install --upgrade pip
-          pip install ruff mypy
+          pip install "ruff==${RUFF_VERSION}" "mypy==${MYPY_VERSION}" pytest
 
-      - name: Run Ruff (lint)
+      - name: Install project dependencies
+        # mypy resolves the real libraries so that wrong keyword arguments and
+        # wrong return types are actually caught. CPU-only torch keeps the
+        # download small; the runner has no GPU.
         run: |
-          cd backend
-          ruff check .
-          ruff format --check .
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r backend/requirements.txt
 
-      - name: Run MyPy (type check)
-        run: |
-          cd backend
-          mypy .
+      - name: Ruff (lint)
+        run: ruff check .
 
-  # =============================================================================
-  # Unit Tests
-  # =============================================================================
+      - name: Ruff (format check)
+        run: ruff format --check .
+
+      - name: mypy (types)
+        run: mypy backend tests conftest.py
+
+  # ===========================================================================
+  # Unit tests - deterministic, no network, no model downloads
+  # ===========================================================================
   unit-tests:
-    name: Unit Tests
+    name: Unit tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -62,29 +83,33 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          cd backend
-          pip install -r requirements.txt
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r backend/requirements.txt
           pip install pytest pytest-cov pytest-mock
 
       - name: Run unit tests
-        run: |
-          cd backend
-          pytest tests/ -v --tb=short -m "unit" --cov=. --cov-report=xml --cov-report=term-missing
+        # `-m unit` is declared in pytest.ini and enforced by the root conftest,
+        # which fails collection if any test carries no marker.
+        run: pytest -m unit --cov=backend --cov-report=xml --cov-report=term-missing
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
         with:
-          files: ./backend/coverage.xml
-          flags: unit
-          name: unit-tests
+          name: coverage-unit
+          path: coverage.xml
 
-  # =============================================================================
-  # Integration Tests
-  # =============================================================================
+  # ===========================================================================
+  # Integration tests - real ChromaDB + local embedding model
+  # ===========================================================================
   integration-tests:
-    name: Integration Tests
+    name: Integration tests
     runs-on: ubuntu-latest
-    needs: lint-and-format
+    env:
+      # Local, persistent Chroma inside the runner's temp dir. The application
+      # embeds Chroma in-process; it does not talk to a Chroma server, so the
+      # docker `chromadb/chroma` service the old workflow started was never used.
+      CHROMA_PERSIST_DIR: ${{ runner.temp }}/chroma_ci
+      EMBEDDING_PROVIDER: huggingface
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -98,37 +123,29 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          cd backend
-          pip install -r requirements.txt
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r backend/requirements.txt
           pip install pytest pytest-cov pytest-mock
 
-      - name: Start ChromaDB
-        run: |
-          docker run -d --name chromadb -p 8000:8000 chromadb/chroma:latest
-          sleep 5
-
       - name: Run integration tests
-        env:
-          CHROMA_HOST: localhost
-          CHROMA_PORT: 8000
-          LLM_PROVIDER: google
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-        run: |
-          cd backend
-          pytest tests/ -v --tb=short -m "integration" --cov=. --cov-report=xml --cov-report=term-missing || true
+        # Real sentence-transformer embeddings and a real Chroma collection.
+        # Tests that need a hosted LLM carry the separate `llm` marker and are
+        # deliberately excluded here - see the `llm-regression` job.
+        run: pytest -m "integration and not llm" --cov=backend --cov-report=xml --cov-report=term-missing
 
-      - name: Cleanup ChromaDB
-        if: always()
-        run: docker stop chromadb && docker rm chromadb
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration
+          path: coverage.xml
 
-  # =============================================================================
-  # Build Docker Image
-  # =============================================================================
+  # ===========================================================================
+  # Docker image build + container smoke test
+  # ===========================================================================
   build-docker:
-    name: Build Docker Image
+    name: Build Docker image
     runs-on: ubuntu-latest
-    needs: [lint-and-format, unit-tests]
-    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'main'
+    needs: [lint, unit-tests, integration-tests]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -147,6 +164,26 @@ jobs:
           cache-to: type=gha,mode=max
           load: true
 
+      - name: Smoke test backend image
+        # Starts the image exactly as the Dockerfile CMD does
+        # (`uvicorn backend.main:app`) and asserts /health answers.
+        run: |
+          docker rm -f test-backend >/dev/null 2>&1 || true
+          docker run -d --name test-backend -p 8000:8000 \
+            -e EMBEDDING_PROVIDER=huggingface \
+            -e CHROMA_PERSIST_DIR=/tmp/chroma \
+            agentic-rag-backend:${{ github.sha }}
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health; then
+              echo "health check passed on attempt ${attempt}"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "backend did not become healthy; container logs:"
+          docker logs test-backend
+          exit 1
+
       - name: Build frontend image
         uses: docker/build-push-action@v5
         with:
@@ -158,73 +195,142 @@ jobs:
           cache-to: type=gha,mode=max
           load: true
 
-      - name: Test Docker images
+      - name: Smoke test frontend image
         run: |
-          # Test backend starts
-          docker run -d --name test-backend -p 8000:8000 \
-            -e LLM_PROVIDER=google \
-            -e GOOGLE_API_KEY=test \
-            agentic-rag-backend:${{ github.sha }}
-          sleep 10
-          curl -f http://localhost:8000/health
-          docker stop test-backend && docker rm test-backend
+          docker rm -f test-frontend >/dev/null 2>&1 || true
+          docker run -d --name test-frontend -p 8501:8501 \
+            -e BACKEND_API_URL=http://localhost:8000 \
+            agentic-rag-frontend:${{ github.sha }}
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8501/_stcore/health; then
+              echo "frontend health check passed on attempt ${attempt}"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "frontend did not become healthy; container logs:"
+          docker logs test-frontend
+          exit 1
 
-  # =============================================================================
-  # Deploy to Staging (on push to develop)
-  # =============================================================================
+  # ===========================================================================
+  # Manual: LLM regression suite (needs a provider API key)
+  # ===========================================================================
+  llm-regression:
+    name: LLM regression suite (manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      CHROMA_PERSIST_DIR: ${{ runner.temp }}/chroma_llm
+      EMBEDDING_PROVIDER: huggingface
+      LLM_PROVIDER: google
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+    steps:
+      - name: Require an LLM provider key
+        run: |
+          if [ -z "${GOOGLE_API_KEY}" ]; then
+            echo "::error::GOOGLE_API_KEY is not configured for this repository, so the"
+            echo "::error::LLM regression suite cannot run. Add the secret (or switch"
+            echo "::error::LLM_PROVIDER and provide OPENAI_API_KEY) before dispatching"
+            echo "::error::this workflow."
+            exit 1
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-cov pytest-mock
+
+      - name: Run LLM-backed regression tests
+        run: pytest -m llm
+
+  # ===========================================================================
+  # Manual: deploy to staging / production (needs HF credentials + environments)
+  # ===========================================================================
   deploy-staging:
-    name: Deploy to Staging
+    name: Deploy to staging (manual)
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    needs: [build-docker]
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
     environment: staging
+    env:
+      HF_USERNAME: ${{ secrets.HF_USERNAME }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
+      - name: Require deploy credentials
+        run: |
+          if [ -z "${HF_USERNAME}" ] || [ -z "${HF_TOKEN}" ]; then
+            echo "::error::HF_USERNAME / HF_TOKEN are not configured, so the staging"
+            echo "::error::deploy cannot run."
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to Hugging Face Spaces
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Hugging Face registry
         uses: docker/login-action@v3
         with:
           registry: hf.co
           username: ${{ secrets.HF_USERNAME }}
           password: ${{ secrets.HF_TOKEN }}
 
-      - name: Push images to HF Spaces
-        run: |
-          docker tag agentic-rag-backend:${{ github.sha }} hf.co/${{ secrets.HF_USERNAME }}/agentic-rag-backend:staging
-          docker tag agentic-rag-frontend:${{ github.sha }} hf.co/${{ secrets.HF_USERNAME }}/agentic-rag-frontend:staging
-          docker push hf.co/${{ secrets.HF_USERNAME }}/agentic-rag-backend:staging
-          docker push hf.co/${{ secrets.HF_USERNAME }}/agentic-rag-frontend:staging
+      - name: Build and push backend image
+        # Built and pushed from this job: the image built by `build-docker` lives
+        # on a different runner and was never available here.
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: hf.co/${{ secrets.HF_USERNAME }}/agentic-rag-backend:staging
 
-  # =============================================================================
-  # Deploy to Production (on push to main)
-  # =============================================================================
   deploy-production:
-    name: Deploy to Production
+    name: Deploy to production (manual)
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    needs: [build-docker]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
+    env:
+      HF_USERNAME: ${{ secrets.HF_USERNAME }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
+      - name: Require deploy credentials
+        run: |
+          if [ -z "${HF_USERNAME}" ] || [ -z "${HF_TOKEN}" ]; then
+            echo "::error::HF_USERNAME / HF_TOKEN are not configured, so the"
+            echo "::error::production deploy cannot run."
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to Hugging Face Spaces
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Hugging Face registry
         uses: docker/login-action@v3
         with:
           registry: hf.co
           username: ${{ secrets.HF_USERNAME }}
           password: ${{ secrets.HF_TOKEN }}
 
-      - name: Push images to HF Spaces
-        run: |
-          docker tag agentic-rag-backend:${{ github.sha }} hf.co/${{ secrets.HF_USERNAME }}/agentic-rag-backend:latest
-          docker tag agentic-rag-frontend:${{ github.sha }} hf.co/${{ secrets.HF_USERNAME }}/agentic-rag-frontend:latest
-          docker push hf.co/${{ secrets.HF_USERNAME }}/agentic-rag-backend:latest
-          docker push hf.co/${{ secrets.HF_USERNAME }}/agentic-rag-frontend:latest
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
         with:
-          generate_release_notes: true
+          context: .
+          file: Dockerfile
+          push: true
+          tags: hf.co/${{ secrets.HF_USERNAME }}/agentic-rag-backend:latest

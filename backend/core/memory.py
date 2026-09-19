@@ -2,13 +2,14 @@
 Session and memory store — maintains in-memory chat history and uploaded document IDs per session.
 """
 
-from typing import Dict, List, Any, TypedDict
+from typing import TypedDict
 
 
 class SessionData(TypedDict):
     """Session data structure."""
-    doc_ids: List[str]
-    chat_history: List[Dict[str, str]]
+
+    doc_ids: list[str]
+    chat_history: list[dict[str, str]]
 
 
 # Simple in-memory storage:
@@ -18,7 +19,7 @@ class SessionData(TypedDict):
 #         "chat_history": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
 #     }
 # }
-_sessions_store: Dict[str, SessionData] = {}
+_sessions_store: dict[str, SessionData] = {}
 
 
 def get_or_create_session(session_id: str) -> SessionData:
@@ -26,10 +27,7 @@ def get_or_create_session(session_id: str) -> SessionData:
     Retrieves a session or initializes it if it does not exist.
     """
     if session_id not in _sessions_store:
-        _sessions_store[session_id] = {
-            "doc_ids": [],
-            "chat_history": []
-        }
+        _sessions_store[session_id] = {"doc_ids": [], "chat_history": []}
     return _sessions_store[session_id]
 
 
@@ -42,7 +40,7 @@ def add_document_to_session(session_id: str, doc_id: str) -> None:
         session["doc_ids"].append(doc_id)
 
 
-def get_session_documents(session_id: str) -> List[str]:
+def get_session_documents(session_id: str) -> list[str]:
     """
     Returns all document IDs uploaded in the given session.
     """
@@ -50,7 +48,7 @@ def get_session_documents(session_id: str) -> List[str]:
     return session["doc_ids"]
 
 
-def get_chat_history(session_id: str) -> List[Dict[str, str]]:
+def get_chat_history(session_id: str) -> list[dict[str, str]]:
     """
     Returns the chat history for a session.
     """

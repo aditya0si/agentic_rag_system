@@ -1,28 +1,32 @@
 """
-Regression test — validates the agentic RAG pipeline against a golden dataset.
+Regression tests — validates the agentic RAG pipeline against a golden dataset.
 
-This test ensures that pipeline changes don't degrade answer quality.
-It uses lightweight string-similarity metrics (no LLM calls required)
-so it can run in CI without API keys.
+Two kinds of check live here:
+
+* retrieval-only checks (marked ``integration``): they embed the golden contexts
+  into a real local ChromaDB collection with the local sentence-transformer and
+  verify that retrieval surfaces the right context. No LLM is involved.
+* answer-quality checks (marked ``llm``): they run the full pipeline, which calls
+  the configured hosted LLM, so they need ``GOOGLE_API_KEY`` (or an OpenAI key)
+  and are not part of the default CI selection.
 
 For full RAGAS evaluation (requires LLM), run:
     cd eval && python run_evaluation.py
 """
 
 import json
-import sys
-from pathlib import Path
 from difflib import SequenceMatcher
+from pathlib import Path
+from typing import Any
 
 import pytest
 
-# Add backend to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
+from backend.core.agents.graph import run_agentic_rag
+from backend.core.basic_rag import run_basic_rag
+from backend.core.ingestion import chunk_document, extract_text
+from backend.core.vector_store import VectorStoreManager
 
-from core.agents.graph import run_agentic_rag
-from core.basic_rag import run_basic_rag
-from core.ingestion import extract_text, chunk_document
-from core.vector_store import VectorStoreManager
+pytestmark = pytest.mark.integration
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -37,10 +41,11 @@ def similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
 
-def load_golden_set() -> list[dict]:
+def load_golden_set() -> list[dict[str, Any]]:
     """Load the golden Q&A dataset."""
-    with open(GOLDEN_SET_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+    with open(GOLDEN_SET_PATH, encoding="utf-8") as f:
+        golden: list[dict[str, Any]] = json.load(f)
+        return golden
 
 
 def setup_test_documents() -> list[str]:
@@ -61,6 +66,7 @@ def setup_test_documents() -> list[str]:
 
         # Write context to temp file
         import tempfile
+
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".txt", delete=False, encoding="utf-8"
         ) as f:
@@ -77,6 +83,7 @@ def setup_test_documents() -> list[str]:
 
         # Clean up temp file
         import os
+
         os.unlink(temp_path)
 
     return doc_ids
@@ -96,6 +103,7 @@ def cleanup_test_documents(doc_ids: list[str]) -> None:
 # Test fixtures
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(scope="module")
 def golden_doc_ids():
     """Set up golden documents once for the whole module."""
@@ -107,6 +115,7 @@ def golden_doc_ids():
 # ─────────────────────────────────────────────────────────────────────────────
 # Regression tests
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestGoldenDataset:
     """Validate pipeline against the golden Q&A set."""
@@ -128,21 +137,19 @@ class TestGoldenDataset:
         Verify that retrieval returns chunks with similarity to the golden context.
         This is a lightweight check that doesn't require LLM calls.
         """
-        from core.agents.retriever import retrieve_chunks
+        from backend.core.agents.retriever import retrieve_chunks
 
         chunks = retrieve_chunks(golden_item["question"], doc_ids=golden_doc_ids)
         assert len(chunks) > 0, "Retrieval should return at least one chunk"
 
         # At least one retrieved chunk should have reasonable similarity to context
-        max_sim = max(
-            similarity(chunk["chunk_text"], golden_item["context"])
-            for chunk in chunks
-        )
+        max_sim = max(similarity(chunk["chunk_text"], golden_item["context"]) for chunk in chunks)
         assert max_sim > 0.3, (
             f"Best retrieved chunk similarity to golden context is too low: {max_sim:.2f}"
         )
 
     @pytest.mark.regression
+    @pytest.mark.llm
     def test_agentic_trace_completeness(self, golden_doc_ids):
         """Verify the agentic pipeline runs all 5 agents."""
         golden = load_golden_set()
@@ -162,11 +169,10 @@ class TestGoldenDataset:
             "answer_generator",
             "hallucination_checker",
         }
-        assert expected_agents.issubset(set(trace)), (
-            f"Missing agents in trace. Got: {trace}"
-        )
+        assert expected_agents.issubset(set(trace)), f"Missing agents in trace. Got: {trace}"
 
     @pytest.mark.regression
+    @pytest.mark.llm
     def test_agentic_better_than_naive(self, golden_doc_ids):
         """
         Verify that agentic RAG produces answers at least as good as naive RAG
@@ -198,6 +204,7 @@ class TestGoldenDataset:
         )
 
     @pytest.mark.regression
+    @pytest.mark.llm
     def test_no_hallucination_on_grounded_answers(self, golden_doc_ids):
         """Verify hallucination checker runs and doesn't flag well-grounded answers."""
         golden = load_golden_set()
@@ -217,12 +224,11 @@ class TestGoldenDataset:
         )
 
     @pytest.mark.regression
+    @pytest.mark.llm
     def test_node_latencies_recorded(self, golden_doc_ids):
         """Verify per-node latency tracking is present in the result."""
         golden = load_golden_set()
-        result = run_agentic_rag(
-            golden[0]["question"], chat_history=[], doc_ids=golden_doc_ids
-        )
+        result = run_agentic_rag(golden[0]["question"], chat_history=[], doc_ids=golden_doc_ids)
 
         latencies = result.get("node_latencies", {})
         assert isinstance(latencies, dict)

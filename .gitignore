@@ -32,6 +32,7 @@ build/
 .ruff_cache/
 htmlcov/
 .coverage
+coverage.xml
 
 # Temporary files & Logs
 *.log

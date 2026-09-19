@@ -5,20 +5,23 @@ Streams agent pipeline progress events to the client in real time,
 so the UI can show live status updates per agent node.
 """
 
-import json
 import asyncio
+import json
+from collections.abc import AsyncIterator
+from typing import Any
+
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from ..core.memory import get_session_documents, add_message_to_history, get_chat_history
+from ..core.agents.graph import AgentState, agentic_pipeline
+from ..core.memory import add_message_to_history, get_chat_history, get_session_documents
 from ..models.schemas import AskRequest
-from ..core.agents.graph import agentic_pipeline
 
 router = APIRouter()
 
 
 @router.post("/ask/stream")
-async def ask_question_stream(request: AskRequest):
+async def ask_question_stream(request: AskRequest) -> StreamingResponse:
     """
     Streams agent pipeline progress via Server-Sent Events.
 
@@ -31,14 +34,16 @@ async def ask_question_stream(request: AskRequest):
     doc_ids = request.doc_ids or get_session_documents(request.session_id)
 
     if not doc_ids:
-        async def no_docs():
+
+        async def no_docs() -> AsyncIterator[str]:
             yield f"data: {json.dumps({'type': 'answer', 'content': 'Please upload at least one document before asking questions.', 'citations': [], 'hallucination_warning': None})}\n\n"
+
         return StreamingResponse(no_docs(), media_type="text/event-stream")
 
     chat_history = get_chat_history(request.session_id)
     add_message_to_history(request.session_id, "user", request.question)
 
-    initial_state = {
+    initial_state: AgentState = {
         "question": request.question,
         "doc_ids": doc_ids,
         "chat_history": chat_history,
@@ -51,12 +56,12 @@ async def ask_question_stream(request: AskRequest):
         "node_latencies": {},
     }
 
-    async def event_generator():
+    async def event_generator() -> AsyncIterator[str]:
         try:
             # `astream` executes the graph already. Build the final state from
             # its node updates instead of invoking the graph a second time.
             # The old implementation doubled LLM calls, cost, and latency.
-            final_state = dict(initial_state)
+            final_state: dict[str, Any] = dict(initial_state)
             # Use LangGraph's streaming API to get per-node updates
             async for event in agentic_pipeline.astream(initial_state, stream_mode="updates"):
                 for node_name, node_output in event.items():
@@ -66,15 +71,17 @@ async def ask_question_stream(request: AskRequest):
 
             answer = final_state.get("answer", "")
             relevant_chunks = final_state.get("relevant_chunks", [])
-            citations = []
+            citations: list[dict[str, Any]] = []
             if relevant_chunks and "I couldn't find relevant information" not in answer:
                 for c in relevant_chunks:
-                    citations.append({
-                        "doc_id": c["doc_id"],
-                        "doc_name": c.get("doc_name", ""),
-                        "page": c.get("page_number", 1),
-                        "chunk_text": c["chunk_text"],
-                    })
+                    citations.append(
+                        {
+                            "doc_id": c["doc_id"],
+                            "doc_name": c.get("doc_name", ""),
+                            "page": c.get("page_number", 1),
+                            "chunk_text": c["chunk_text"],
+                        }
+                    )
 
             add_message_to_history(request.session_id, "assistant", answer)
 
