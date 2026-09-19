@@ -108,7 +108,9 @@ jobs:
       # Local, persistent Chroma inside the runner's temp dir. The application
       # embeds Chroma in-process; it does not talk to a Chroma server, so the
       # docker `chromadb/chroma` service the old workflow started was never used.
-      CHROMA_PERSIST_DIR: ${{ runner.temp }}/chroma_ci
+      # Absolute path on the runner (the `runner` context is not available in
+      # a job-level env block, so this is a literal).
+      CHROMA_PERSIST_DIR: /tmp/chroma_ci
       EMBEDDING_PROVIDER: huggingface
     steps:
       - name: Checkout code
@@ -220,7 +222,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
-      CHROMA_PERSIST_DIR: ${{ runner.temp }}/chroma_llm
+      CHROMA_PERSIST_DIR: /tmp/chroma_llm
       EMBEDDING_PROVIDER: huggingface
       LLM_PROVIDER: google
       GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
