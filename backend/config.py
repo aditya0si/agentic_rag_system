@@ -7,6 +7,7 @@ from this file rather than reading os.environ directly.
 
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load .env from the backend directory
@@ -33,7 +34,9 @@ GOOGLE_MODEL: str = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash")
 # Embedding Configuration
 # =============================================================================
 
-EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "huggingface")  # "openai" or "huggingface"
+EMBEDDING_PROVIDER: str = os.getenv(
+    "EMBEDDING_PROVIDER", "huggingface"
+)  # "openai" or "huggingface"
 OPENAI_EMBEDDING_MODEL: str = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 HUGGINGFACE_EMBEDDING_MODEL: str = os.getenv("HUGGINGFACE_EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 
@@ -70,6 +73,7 @@ ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development").lower()
 # =============================================================================
 # Validation
 # =============================================================================
+
 
 def validate_config() -> list[str]:
     """

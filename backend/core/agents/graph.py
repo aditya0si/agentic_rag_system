@@ -2,17 +2,18 @@
 LangGraph StateGraph definition — manages states, transitions, and agent nodes.
 """
 
-from typing import TypedDict, List, Dict, Any
-from langgraph.graph import StateGraph, START, END
-import structlog
+from typing import Any, TypedDict
 
-from .query_rewriter import rewrite_query
-from .retriever import retrieve_chunks
-from .relevance_grader import grade_chunk_relevance
+import structlog
+from langgraph.graph import END, START, StateGraph
+
+from ..metrics import metrics
 from .answer_generator import generate_answer
 from .hallucination_checker import check_hallucination
+from .query_rewriter import rewrite_query
+from .relevance_grader import grade_chunk_relevance
 from .reranker import rerank_chunks
-from ..metrics import metrics, track_agent_execution
+from .retriever import retrieve_chunks
 
 logger = structlog.get_logger(__name__)
 
@@ -21,44 +22,46 @@ class AgentState(TypedDict):
     """
     Represents the state of the agentic RAG pipeline.
     """
+
     question: str
-    doc_ids: List[str] | None
-    chat_history: List[Dict[str, str]]
+    doc_ids: list[str] | None
+    chat_history: list[dict[str, str]]
     rewritten_query: str
-    retrieved_chunks: List[Dict[str, Any]]
-    relevant_chunks: List[Dict[str, Any]]
+    retrieved_chunks: list[dict[str, Any]]
+    relevant_chunks: list[dict[str, Any]]
     answer: str
-    agent_trace: List[str]
+    agent_trace: list[str]
     hallucination_warning: str | None
-    node_latencies: Dict[str, float]  # Per-node latency for observability
+    node_latencies: dict[str, float]  # Per-node latency for observability
+
 
 # =============================================================================
 # Node Functions
 # =============================================================================
 
-def rewrite_node(state: AgentState) -> Dict[str, Any]:
+
+def rewrite_node(state: AgentState) -> dict[str, Any]:
     """
     Query Rewriting node — reformulates the user question based on chat history.
     """
     question = state["question"]
     chat_history = state.get("chat_history", [])
-    
+
     rewritten = rewrite_query(question, chat_history)
-    
+
     trace = list(state.get("agent_trace", []))
     trace.append("query_rewriter")
-    
-    return {
-        "rewritten_query": rewritten,
-        "agent_trace": trace
-    }
 
-def retrieve_node(state: AgentState) -> Dict[str, Any]:
+    return {"rewritten_query": rewritten, "agent_trace": trace}
+
+
+def retrieve_node(state: AgentState) -> dict[str, Any]:
     """
     Retrieval node — fetches top-k document chunks matching the rewritten query,
     then re-ranks them using a cross-encoder for improved precision.
     """
     import time
+
     start = time.time()
 
     query = state["rewritten_query"]
@@ -85,11 +88,13 @@ def retrieve_node(state: AgentState) -> Dict[str, Any]:
         "node_latencies": latencies,
     }
 
-def grade_node(state: AgentState) -> Dict[str, Any]:
+
+def grade_node(state: AgentState) -> dict[str, Any]:
     """
     Relevance Grading node — evaluates retrieved chunks and filters out irrelevant ones.
     """
     import time
+
     start = time.time()
 
     query = state["rewritten_query"]
@@ -124,11 +129,13 @@ def grade_node(state: AgentState) -> Dict[str, Any]:
         "node_latencies": latencies,
     }
 
-def generate_node(state: AgentState) -> Dict[str, Any]:
+
+def generate_node(state: AgentState) -> dict[str, Any]:
     """
     Answer Generation node — produces a grounded response from relevant chunks.
     """
     import time
+
     start = time.time()
 
     query = state["rewritten_query"]
@@ -152,27 +159,26 @@ def generate_node(state: AgentState) -> Dict[str, Any]:
         "node_latencies": latencies,
     }
 
-def hallucination_node(state: AgentState) -> Dict[str, Any]:
+
+def hallucination_node(state: AgentState) -> dict[str, Any]:
     """
     Hallucination Checker node — cross-checks the generated answer against source contexts.
     """
     answer = state.get("answer", "")
     chunks = state.get("relevant_chunks", [])
-    
+
     # Run the hallucination check
     is_hallucinated = check_hallucination(answer, chunks)
-    
+
     warning = None
     if is_hallucinated:
         warning = "WARNING: Some claims may not be fully supported by the source documents"
-        
+
     trace = list(state.get("agent_trace", []))
     trace.append("hallucination_checker")
-    
-    return {
-        "hallucination_warning": warning,
-        "agent_trace": trace
-    }
+
+    return {"hallucination_warning": warning, "agent_trace": trace}
+
 
 # =============================================================================
 # Graph Construction
@@ -202,15 +208,14 @@ agentic_pipeline = workflow.compile()
 # Execution Helper
 # =============================================================================
 
+
 def run_agentic_rag(
-    question: str,
-    chat_history: List[Dict[str, str]],
-    doc_ids: List[str] | None = None
-) -> Dict[str, Any]:
+    question: str, chat_history: list[dict[str, str]], doc_ids: list[str] | None = None
+) -> dict[str, Any]:
     """
     Invokes the Compiled LangGraph agentic RAG pipeline.
     """
-    initial_state = {
+    initial_state: AgentState = {
         "question": question,
         "doc_ids": doc_ids,
         "chat_history": chat_history,
@@ -222,4 +227,5 @@ def run_agentic_rag(
         "hallucination_warning": None,
         "node_latencies": {},
     }
-    return agentic_pipeline.invoke(initial_state)
+    result: dict[str, Any] = agentic_pipeline.invoke(initial_state)
+    return result

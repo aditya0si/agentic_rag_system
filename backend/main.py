@@ -5,15 +5,16 @@ Registers all routers, middleware, and configures the application.
 """
 
 import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import warnings
 
 from .config import CORS_ORIGINS, validate_config
 from .logging_config import configure_logging
-from .routers import health, upload, ask, metrics as metrics_router, stream
-from .middleware.request_logging import RequestLoggingMiddleware
 from .middleware.rate_limiter import RateLimitMiddleware
+from .middleware.request_logging import RequestLoggingMiddleware
+from .routers import ask, health, stream, upload
+from .routers import metrics as metrics_router
 
 # =============================================================================
 # Logging — configure structured JSON logging before anything else
@@ -73,8 +74,9 @@ app.include_router(stream.router, tags=["Streaming"])
 # Startup Event — validate configuration
 # ---------------------------------------------------------------------------
 
+
 @app.on_event("startup")
-async def startup_event():
+async def startup_event() -> None:
     warnings = validate_config()
     if warnings:
         for w in warnings:

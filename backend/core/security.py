@@ -4,9 +4,10 @@ Security utilities — input validation, sanitization, and prompt injection guar
 Protects the RAG pipeline from malicious inputs and prompt injection attacks.
 """
 
-import re
 import html
+import re
 from typing import Any
+
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -92,9 +93,7 @@ def validate_filename(filename: str) -> str:
     # Check extension
     lower = filename.lower()
     if not any(lower.endswith(ext) for ext in ALLOWED_EXTENSIONS):
-        raise ValueError(
-            f"Unsupported file type. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
-        )
+        raise ValueError(f"Unsupported file type. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
 
     return filename
 
@@ -139,9 +138,11 @@ def sanitize_chat_history(history: list[dict[str, Any]]) -> list[dict[str, Any]]
         content = msg.get("content", "")
         if role not in ("user", "assistant"):
             continue
-        sanitized.append({
-            "role": role,
-            "content": sanitize_text(content, max_length=MAX_QUESTION_LENGTH),
-        })
+        sanitized.append(
+            {
+                "role": role,
+                "content": sanitize_text(content, max_length=MAX_QUESTION_LENGTH),
+            }
+        )
 
     return sanitized

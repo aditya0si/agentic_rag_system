@@ -6,6 +6,7 @@ Includes retry logic, health checking, and structured error handling.
 
 import os
 import time
+
 import httpx
 
 API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000")
@@ -13,6 +14,7 @@ API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000")
 # ═══════════════════════════════════════════════════════════════════════════════
 # Health Check
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def check_backend_health(timeout: float = 5.0) -> bool:
     """
@@ -30,11 +32,9 @@ def check_backend_health(timeout: float = 5.0) -> bool:
 # Document Upload
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def upload_document_api(
-    filename: str,
-    content: bytes,
-    session_id: str,
-    max_retries: int = 2
+    filename: str, content: bytes, session_id: str, max_retries: int = 2
 ) -> dict:
     """
     Uploads a document to the backend /upload endpoint with retry logic.
@@ -57,8 +57,10 @@ def upload_document_api(
     for attempt in range(1, max_retries + 2):  # initial + retries
         try:
             response = httpx.post(
-                url, files=files, data=data,
-                timeout=120.0  # generous timeout for embedding large files
+                url,
+                files=files,
+                data=data,
+                timeout=120.0,  # generous timeout for embedding large files
             )
             if response.status_code == 200:
                 return response.json()
@@ -68,29 +70,26 @@ def upload_document_api(
                     err_data = response.json()
                     return {
                         "error": err_data.get("error", "upload_failed"),
-                        "message": err_data.get("detail", err_data.get("message", "Upload failed"))
+                        "message": err_data.get("detail", err_data.get("message", "Upload failed")),
                     }
                 except Exception:
                     return {
                         "error": "upload_failed",
-                        "message": f"HTTP {response.status_code}: {response.text[:200]}"
+                        "message": f"HTTP {response.status_code}: {response.text[:200]}",
                     }
         except httpx.TimeoutException:
             last_error = {
                 "error": "timeout",
-                "message": f"Upload timed out after 120s (attempt {attempt})"
+                "message": f"Upload timed out after 120s (attempt {attempt})",
             }
         except httpx.ConnectError:
             last_error = {
                 "error": "connection_error",
-                "message": f"Cannot reach backend at {url}. Is the server running?"
+                "message": f"Cannot reach backend at {url}. Is the server running?",
             }
             break  # no point retrying if we can't connect
         except Exception as e:
-            last_error = {
-                "error": "connection_error",
-                "message": f"Connection failed: {str(e)}"
-            }
+            last_error = {"error": "connection_error", "message": f"Connection failed: {str(e)}"}
 
         if attempt <= max_retries:
             time.sleep(1.5 * attempt)  # exponential-ish backoff
@@ -102,11 +101,9 @@ def upload_document_api(
 # Question Answering
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def ask_question_api(
-    question: str,
-    session_id: str,
-    doc_ids: list[str] | None = None,
-    max_retries: int = 1
+    question: str, session_id: str, doc_ids: list[str] | None = None, max_retries: int = 1
 ) -> dict:
     """
     Sends a query to the backend /ask endpoint with retry logic.
@@ -122,18 +119,15 @@ def ask_question_api(
         hallucination_warning) or error fields (error, message).
     """
     url = f"{API_URL}/ask"
-    payload = {
-        "session_id": session_id,
-        "question": question,
-        "doc_ids": doc_ids
-    }
+    payload = {"session_id": session_id, "question": question, "doc_ids": doc_ids}
 
     last_error = None
     for attempt in range(1, max_retries + 2):
         try:
             response = httpx.post(
-                url, json=payload,
-                timeout=90.0  # RAG pipeline can take time
+                url,
+                json=payload,
+                timeout=90.0,  # RAG pipeline can take time
             )
             if response.status_code == 200:
                 return response.json()
@@ -142,29 +136,28 @@ def ask_question_api(
                     err_data = response.json()
                     return {
                         "error": err_data.get("error", "ask_failed"),
-                        "message": err_data.get("detail", err_data.get("message", "Request failed"))
+                        "message": err_data.get(
+                            "detail", err_data.get("message", "Request failed")
+                        ),
                     }
                 except Exception:
                     return {
                         "error": "ask_failed",
-                        "message": f"HTTP {response.status_code}: {response.text[:200]}"
+                        "message": f"HTTP {response.status_code}: {response.text[:200]}",
                     }
         except httpx.TimeoutException:
             last_error = {
                 "error": "timeout",
-                "message": "Request timed out. The RAG pipeline may be processing a large document."
+                "message": "Request timed out. The RAG pipeline may be processing a large document.",
             }
         except httpx.ConnectError:
             last_error = {
                 "error": "connection_error",
-                "message": f"Cannot reach backend at {url}. Is the server running?"
+                "message": f"Cannot reach backend at {url}. Is the server running?",
             }
             break
         except Exception as e:
-            last_error = {
-                "error": "connection_error",
-                "message": f"Connection failed: {str(e)}"
-            }
+            last_error = {"error": "connection_error", "message": f"Connection failed: {str(e)}"}
 
         if attempt <= max_retries:
             time.sleep(2.0 * attempt)

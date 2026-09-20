@@ -4,17 +4,19 @@ Retry utilities with exponential backoff for resilient external API calls.
 Uses tenacity for configurable retry policies.
 """
 
-from functools import wraps
-from typing import Callable, TypeVar, Any
+import logging
+from collections.abc import Callable
+from typing import TypeVar
+
+import structlog
 from tenacity import (
+    after_log,
+    before_sleep_log,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
-    after_log,
 )
-import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -34,14 +36,14 @@ def create_retry_decorator(
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
     Create a retry decorator with exponential backoff.
-    
+
     Args:
         max_attempts: Maximum number of attempts (including first)
         min_wait: Minimum wait time between retries (seconds)
         max_wait: Maximum wait time between retries (seconds)
         exponential_base: Base for exponential backoff
         retry_exceptions: Exception types to retry on
-        
+
     Returns:
         Decorator function
     """
@@ -53,8 +55,8 @@ def create_retry_decorator(
             exp_base=exponential_base,
         ),
         retry=retry_if_exception_type(retry_exceptions),
-        before_sleep=before_sleep_log(logger, "WARNING"),
-        after=after_log(logger, "INFO"),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        after=after_log(logger, logging.INFO),
         reraise=True,
     )
 
@@ -110,7 +112,7 @@ def with_retry(
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
     Decorator to add retry logic to a function.
-    
+
     Usage:
         @with_retry(max_attempts=3)
         async def my_api_call():

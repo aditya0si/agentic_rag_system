@@ -20,6 +20,8 @@ langchain-openai>=0.3.15
 langchain-google-genai>=2.1.0
 langchain-community>=0.3.20
 langchain-huggingface>=0.1.2
+# imported directly by core/ingestion.py (previously only pulled in transitively)
+langchain-text-splitters>=0.3.0
 
 # Vector Store
 chromadb>=1.0.0
@@ -39,3 +41,9 @@ langsmith>=0.3.40
 
 # Utilities
 httpx>=0.28.0
+# Structured logging — imported by core/*, middleware/* and logging_config.py.
+# These two were missing from this file, so any install driven by
+# requirements.txt (CI and the Docker image) crashed on `import structlog`.
+structlog>=25.1.0
+# Retry helper used by retry.py
+tenacity>=8.3.0

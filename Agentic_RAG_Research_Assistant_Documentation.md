@@ -305,10 +305,12 @@ class AskRequest(BaseModel):
     question: str
     doc_ids: list[str] | None = None
 
+
 class Citation(BaseModel):
     doc_id: str
     page: int
     chunk_text: str
+
 
 class AskResponse(BaseModel):
     answer: str
@@ -325,6 +327,7 @@ class AgentState(TypedDict):
     relevant_chunks: list[dict]
     answer: str
     chat_history: list[dict]
+
 
 graph = StateGraph(AgentState)
 graph.add_node("rewrite", query_rewriter)

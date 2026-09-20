@@ -5,7 +5,12 @@ Validates counters, histograms, gauges, and the Timer context manager.
 """
 
 import time
+
+import pytest
+
 from backend.core.metrics import MetricsCollector, Timer, metrics, track_agent_execution
+
+pytestmark = pytest.mark.unit
 
 
 class TestMetricsCollector:
@@ -67,11 +72,15 @@ class TestMetricsCollector:
 
 class TestTimer:
     def test_timer_records_duration(self):
-        collector = MetricsCollector()
+        # Timer records into the module-level collector singleton, not into a
+        # locally constructed MetricsCollector.
+        before = metrics.get_metrics()["histograms"].get("test_op{label=x}", {}).get("count", 0)
+
         with Timer("test_op", label="x"):
             time.sleep(0.01)
-        stats = collector.get_metrics()["histograms"]["test_op{label=x}"]
-        assert stats["count"] == 1
+
+        stats = metrics.get_metrics()["histograms"]["test_op{label=x}"]
+        assert stats["count"] == before + 1
         assert stats["min"] > 0
 
 
